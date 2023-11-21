@@ -32,7 +32,7 @@ class usb_controller_t:
         timeout (float): Timeout for serial communication operations (default is 100 milliseconds).
     """
     def __init__(self, vid, pid, baudrate, timeout=100e-3):
-        """Initializes tUSB Controller class, serving as the constructor 
+        """Initializes USB Controller class, serving as the constructor 
         for this class. This function automatically searches for the device 
         based on its Vendor ID (VID) and Product ID (PID) and establishes a 
         connection if a device matching the specified specifications is detected. 
@@ -67,6 +67,10 @@ class usb_controller_t:
             print("Device [VID:PID={}:{}] is not found".format(hex(vid), hex(pid)))
       
     def send_data(self, data):
+        """Send data function example
+        Args:
+            data (int): Data .
+        """
         try:
             self.__device__.write(data)
         except serial.SerialException as err:
