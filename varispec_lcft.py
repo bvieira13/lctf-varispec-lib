@@ -1,15 +1,14 @@
 """
 varispec-lctf Module
 
-This module was developed to address demands related to the control of 
-VariSpec LCTF equipment manufactured by Cambridge Research & Instrumen-
-tation, Inc. The library was based on the development of the LCTF VariSpec 
-VIS-20-20;however, the implemented functions cover all models available 
-in the market from this manufacturer. 
+This module was developed to address demands related to the control of VariSpec LCTF 
+equipment manufactured by Cambridge Research & Instrumentation (CRi), Inc. The library was
+based on the development of the LCTF VariSpec VIS-20-20;however, the implemented 
+functions cover all models available in the market from this manufacturer. 
 
-This file contains the usb_controller_t class to interface between the 
-computer and the LCTF electronic controller module, and another varispec_module_t 
-to implement the communication protocol outlined in the manufacturer's manual.
+This file contains the usb_controller_t class to interface between the computer and
+the LCTF electronic controller module, and another varispec_module_t to implement the
+communication protocol outlined in the manufacturer's manual.
 
 Copyright (c) 2023 Bruno Freitas Vieira
 """
@@ -32,12 +31,11 @@ class usb_controller_t:
         timeout (float): Timeout for serial communication operations (default is 100 milliseconds).
     """
     def __init__(self, vid, pid, baudrate, timeout=100e-3):
-        """Initializes USB Controller class, serving as the constructor 
-        for this class. This function automatically searches for the device 
-        based on its Vendor ID (VID) and Product ID (PID) and establishes a 
-        connection if a device matching the specified specifications is detected. 
-        If no device with the provided characteristics is found, the function 
-        returns an error message. 
+        """Initializes USB Controller class, serving as the constructor for this class.
+        This function automatically searches for the device based on its Vendor ID (VID)
+        and Product ID (PID) and establishes a connection if a device matching the specified 
+        specifications is detected. If no device with the provided characteristics is found, 
+        the function returns an error message. 
 
         Args:
             vid (int): Vendor ID of the USB device.
@@ -67,15 +65,36 @@ class usb_controller_t:
             print("Device [VID:PID={}:{}] is not found".format(hex(vid), hex(pid)))
       
     def send_data(self, data):
-        """Send data function example
+        """Sends the specified data to the device.
+
         Args:
-            data (int): Data .
+            data (uint8): The data to be sent, which can be either a single uint8 
+            value or a vector of uint8 values.
+
+        Raises:
+            serial.SerialException: If an error occurs during the data transmission.
+
+        This method attempts to write the provided data to the device. If 'data' is a
+        single uint8 value, it is sent directly; if it's a vector, the entire vector
+        is sent. In case of an error during transmission, a SerialException is caught,
+        and an error message is printed.
         """
         try:
             self.__device__.write(data)
         except serial.SerialException as err:
             print(f"Error when try sending data: {err}")
+
     def receive_data(self) -> np.uint8:
+        """Receives data from the device over USB communication.
+
+        Returns:
+            List[np.uint8]: A list containing the received byte(s) data.
+
+        This method reads byte data from the device until data is available in the input buffer
+        or a timeout of 500 milliseconds is reached. If data is received within the timeout period,
+        it is converted to integers and stored in a list, which is then returned. If no data is
+        received within the timeout, a timeout message is printed, and an empty list is returned.
+        """
         timeout = tim.time() + 500e-3
         timeout_flag = False
         while self.__device__.in_waiting == 0:
@@ -97,16 +116,33 @@ class usb_controller_t:
         return data_vec
     
     def get_port_str(self):
+        """Gets the port string associated with the device.
+
+        Returns:
+            str: The port string of the device.
+
+        This method retrieves and returns the port string of the device, providing
+        information about the communication port to which the device is connected.
+        """
         return self.__device__.port
     
     def close(self) -> None:
+        """Closes the serial port associated with the device.
+
+        This method attempts to close the serial port if it is currently open. If the
+        serial port is not open or an error occurs during the closing process, a
+        SerialException is caught, and an error message is printed.
+
+        Returns:
+            None
+        """
         try:
             if self.__device__ is not None:
                 self.__device__.close()
         except serial.SerialException as err:
             print(f"Error closing serial port: {err}")      
 
-class varispec_error_t(Enum):
+"""class varispec_error_t(Enum):
     NO_ERROR = 0
     NOT_OPEN = 100
     BAD_HANDLE = auto()
@@ -141,29 +177,68 @@ class varispec_error_t(Enum):
 
     INT_OBJECT_CREATION_FAILED =1000
     INT_WAVEPLATESTAGESINVALID =auto()
-
+"""
 
 class varispec_module_t:
+    """ VariSpec Module Class
+
+    This class has methods to enable the control of LCTF VariSpec modules developed by 
+    CRi, Inc. for most models available in the market. It was developed based on the 
+    VIS-20-20 model. This class utilizes methods from the USB Controller class to 
+    interface with the equipment via USB.
+    
+    Attributes:
+        __vid__ (uint16): USB Vendor ID.
+        __pid__ (uint16): USB Product ID.
+        __baudrate__ (uint32): Baud rate for communication.
+        __controller__ (usb_controller_t): USB controller instance.
+        __brief_mode__ (uint8): Current brief mode.
+        __wavelength__ (float): Current wavelength setting.
+        __current_wavelength__ (float): Current measured wavelength.
+        __current_palette_pos__ (numpy.uint8): Current palette position.
+        __wavelength_step__ (float): Wavelength step value.
+        __fw_rev__ (str): Firmware revision.
+        __min_wave__ (float): Minimum supported wavelength.
+        __max_wave__ (float): Maximum supported wavelength.
+        __ser_num__ (str): Serial number of the device.
+    """    
     def __init__(self):
-        self.__vid__ = 0x0403
-        self.__pid__ = 0x6001
-        self.__baudrate__ = 115200 # can be 9600, but needs switch in eletronic module
+        """
+        Constructor to initialize the LCTF module instance.
+        """
+        self.__vid__ = 0x0403       # Vendor ID
+        self.__pid__ = 0x6001       # Product ID
+        self.__baudrate__ = 115200  # Baudrate can be 9600, but needs a switch in the electronic module
+        
+        # USB controller instance creation
         self.__controller__ = usb_controller_t(self.__vid__,self.__pid__,self.__baudrate__)
+        
+        # Get the port name associated with the VariSpec LCTF device
         port_name = self.__controller__.get_port_str()
         
+        # Query and store various parameters from the connected device
         self.__brief_mode__ = self.query_brief()
         self.__wavelenght__ = self.query_pallet()
         self.__current_wavelenght__ : float     = self.query_wavelenght()
         self.__current_palette_pos__: np.uint8  = self.query_palette_pos()
         self.__wavelenght_step__    : float     = self.query_jump()
 
+        # Query firmware version, wavelength interval, and serial number
         self.__fw_rev__, self.__min_wave__, self.__max_wave__, self.__ser_num__ = self.__get_version__()
         
-        print("LCTF VariSpec VIS-07-HC-20 is connected in serial port: {}".format(port_name))
+        # Print information about the connected LCTF device
+        print("LCTF VariSpec is connected in serial port: {}".format(port_name))
         print("Firmware: {}\t Wavelenght interval: {}-{} nm\t Serial number: {}"
               .format(self.__fw_rev__,self.__min_wave__,self.__max_wave__,self.__ser_num__))
     
     def awake(self) -> bool:
+        """
+        Method awakens filter with ID number. The ID number is the filter’s 5-digit 
+        serial number, such as 50527, 50782, etc.
+
+        Returns:
+            bool: True if the waking up process is successful, False otherwise.
+        """
         opcode = 'A'
         ser_num_str = str(self.__ser_num__)
         is_data_ok = self.__check__(opcode,ser_num_str)
@@ -171,8 +246,26 @@ class varispec_module_t:
             return True
         return False
     
-# This command just works for query fuctions
     def brief(self,mode=1) -> bool:
+        """
+        Set the brief mode for the LCTF module. This method only affects query functions.
+
+        Args:
+            mode (uint8): Brief mode to be set. Default is 1.
+
+        Returns:
+            bool: True if the brief mode is set successfully, False otherwise.
+
+        Explanation:
+            If mode is 0, it selects the VariSpec filter’s normal format for replying 
+            to queries.
+            If mode is 1, it selects the brief format.
+            If mode is 2, it selects the auto-confirm format.
+            At power-up, the default is to use the normal format.
+
+            In Brief format, the VariSpec filter does not echo the command letter and 
+            omits all leading spaces. Thus, the normal reply.
+        """
         self.__brief_mode__ = mode
         opcode = 'B'
         arg = str(mode)
@@ -182,6 +275,20 @@ class varispec_module_t:
         return False
     
     def query_brief(self) -> np.uint8:
+        """
+        Query and retrieve the current brief mode setting from the LCTF module.
+
+        Returns:
+            np.uint8: Current brief mode setting (0 for normal, 1 for brief, 2 for auto-confirm).
+
+        Explanation:
+            This method sends a query command ("B?") to the LCTF module to obtain the current 
+            brief mode setting.The response is then matched to a dictionary to determine the 
+            corresponding brief mode.
+
+            If an error occurs during the query process, None is returned, and an error message 
+            is printed.
+        """
         opcode = 'B'
         mode = {'b     0\r' :0,
                 '1\r'       :1,
@@ -195,6 +302,13 @@ class varispec_module_t:
         return self.__brief_mode__
     
     def clear_palette(self) -> bool:
+        """
+        Clear the entire palette of the LCTF module.
+
+        Returns:
+            bool: True if the palette is cleared successfully, False otherwise.
+
+        """
         opcode = 'C'
         arg = '1'
         is_data_ok = self.__check__(opcode,arg)
@@ -203,6 +317,17 @@ class varispec_module_t:
         return False
     
     def query_clr_palette(self) -> bool:
+        """
+        Query and check if the palette clearing process is complete in the LCTF module.
+
+        Returns:
+            bool: True if the palette clearing is complete, False otherwise.
+
+        Explanation:
+            This method sends a query command ('C?') to the LCTF module to check the status 
+            of the palette clearing process.
+            The expected response 'c     0\r' indicates that the palette clearing is complete.
+        """
         opcode = 'C'
         status = {'c     0\r':0}
         query_rsp = self.__query__(opcode,status)
@@ -514,19 +639,3 @@ class varispec_module_t:
         response = self.__send_receive__(opcode,'?')
         return table[response[3:]]
 
-def main():
-    print("Entry in main function")
-    lctf = varispec_module_t()
-    
-    print(lctf.status())
-    tim.sleep(10)
-
-    temperature = lctf.get_temperature()
-
-    print("Current wavelenght: {}°C".format(temperature))
-    
-    
-    lctf.disconneted()
-
-if __name__ == "__main__":
-    main()
